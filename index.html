@@ -547,7 +547,6 @@ async function callClaude() {
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
         max_tokens: 600,
-        stream: true,
         system: getSystemPrompt(),
         messages: apiMessages
       })
@@ -555,33 +554,16 @@ async function callClaude() {
     if (!resp.ok) {
       let errText = 'Ошибка ' + resp.status;
       try { const e = await resp.json(); errText = e.error?.message || errText; } catch {}
-        throw new Error(errText);
+      throw new Error(errText);
     }
+    const data = await resp.json();
+    const text = data.content?.[0]?.text || '';
     typing.remove();
-    const botEl = addMsg('bot', '');
-    let full = '';
-    let buf = '';
-    const reader = resp.body.getReader();
-    const dec = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop();
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        try {
-          const ev = JSON.parse(line.slice(6));
-          if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
-            full += ev.delta.text;
-            botEl.textContent = full;
-            msgs.scrollTop = msgs.scrollHeight;
-          }
-        } catch {}
-      }
+    if (text) {
+      addMsg('bot', text);
+      apiMessages.push({ role: 'assistant', content: text });
     }
-    if (full) apiMessages.push({ role: 'assistant', content: full });
+    msgs.scrollTop = msgs.scrollHeight;
   } catch (err) {
     typing.remove();
     addMsg('bot', '⚠️ ' + err.message);
