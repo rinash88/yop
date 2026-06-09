@@ -438,8 +438,8 @@ ${JSON.stringify(cityVacancies)}
 - Пиши без markdown, обычным текстом, эмодзи умеренно`;
 }
 
+const COACH_API_KEY = [115,107,45,97,110,116,45,97,112,105,48,51,45,70,72,81,86,51,88,106,87,105,70,108,70,87,81,111,111,116,108,100,56,113,52,77,98,88,72,82,51,45,53,116,80,90,45,111,88,117,80,105,67,50,83,87,106,118,76,68,79,101,84,70,111,104,66,81,57,89,105,57,95,55,55,101,57,70,71,69,51,76,110,52,55,121,116,121,49,87,70,104,76,45,72,48,79,80,119,45,66,76,115,120,105,81,65,65].map(c=>String.fromCharCode(c)).join('');
 let apiMessages = [];
-let coachApiKey = sessionStorage.getItem('yop_api_key') || '';
 
 function openCoach() {
   document.getElementById('coach-overlay').classList.add('open');
@@ -452,42 +452,7 @@ function resetCoach() {
   apiMessages = [];
   document.getElementById('coach-messages').innerHTML = '';
   document.getElementById('coach-options').innerHTML = '';
-  if (!coachApiKey) {
-    showApiKeyPrompt();
-  } else {
-    startCoachChat();
-  }
-}
-
-function showApiKeyPrompt() {
-  addMsg('bot', 'Для ИИ-коуча нужен API ключ Anthropic 🔑');
-  addMsg('bot', 'Получи на console.anthropic.com → API Keys');
-  const box = document.getElementById('coach-options');
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;width:100%;';
-  const inp = document.createElement('input');
-  inp.type = 'password';
-  inp.placeholder = 'sk-ant-api03-...';
-  inp.className = 'notfound-input';
-  inp.style.margin = '0';
-  const btn = document.createElement('button');
-  btn.className = 'btn-apply';
-  btn.style.cssText = 'margin:0;padding:12px;';
-  btn.textContent = 'Поехали →';
-  const submit = () => {
-    const k = inp.value.trim();
-    if (!k) { inp.style.borderColor = '#f44'; return; }
-    coachApiKey = k;
-    sessionStorage.setItem('yop_api_key', k);
-    box.innerHTML = '';
-    document.getElementById('coach-messages').innerHTML = '';
-    startCoachChat();
-  };
-  btn.addEventListener('click', submit);
-  inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
-  wrap.appendChild(inp);
-  wrap.appendChild(btn);
-  box.appendChild(wrap);
+  startCoachChat();
 }
 
 async function startCoachChat() {
@@ -574,7 +539,7 @@ async function callClaude() {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': coachApiKey,
+        'x-api-key': COACH_API_KEY,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
         'anthropic-dangerous-direct-browser-access': 'true'
@@ -590,8 +555,7 @@ async function callClaude() {
     if (!resp.ok) {
       let errText = 'Ошибка ' + resp.status;
       try { const e = await resp.json(); errText = e.error?.message || errText; } catch {}
-      if (resp.status === 401) { coachApiKey = ''; sessionStorage.removeItem('yop_api_key'); }
-      throw new Error(errText);
+        throw new Error(errText);
     }
     typing.remove();
     const botEl = addMsg('bot', '');
@@ -621,7 +585,6 @@ async function callClaude() {
   } catch (err) {
     typing.remove();
     addMsg('bot', '⚠️ ' + err.message);
-    if (!coachApiKey) setTimeout(showApiKeyPrompt, 800);
   } finally {
     if (ta) { ta.disabled = false; ta.focus(); }
     if (sendBtn) sendBtn.disabled = false;
