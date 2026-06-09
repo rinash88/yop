@@ -413,42 +413,33 @@ setTimeout(() => {
   setTimeout(() => t.classList.remove('show'), 3000);
 }, 600);
 
-// === ИИ-коуч ===
-const coachQuestions = [
-  { q: "Привет! Я Профи 👋 Помогу понять, какая работа тебе зайдёт.", auto: true },
-  { q: "Ответь на 4 коротких вопроса — подберу профессию и пару вакансий в твоём городе.", auto: true },
-  { q: "Что тебе ближе? 🤔", options: [
-    { label: "Общаться с людьми", key: "people" },
-    { label: "Работать руками", key: "hands" },
-    { label: "Сидеть за компом", key: "digital" }
-  ] },
-  { q: "Где удобнее работать? 🏠", options: [
-    { label: "Из дома", key: "remote" },
-    { label: "Не важно", key: "any-place" },
-    { label: "Только не дома", key: "onsite" }
-  ] },
-  { q: "Какой график подходит? 📅", options: [
-    { label: "Подработка", key: "part" },
-    { label: "Постоянка", key: "perm" },
-    { label: "Без разницы", key: "any-sched" }
-  ] },
-  { q: "На что хочешь накопить? 💸", options: [
-    { label: "Гаджеты", key: "gadgets" },
-    { label: "Шмот", key: "clothes" },
-    { label: "Билеты/тусовки", key: "tickets" },
-    { label: "Свои деньги", key: "freedom" }
-  ] }
-];
+// === ИИ-коуч (Claude API) ===
+function getSystemPrompt() {
+  const cityVacancies = vacancies.filter(v => v.city === currentCity).map(v => ({
+    title: v.title, emp: v.emp, salary: v.salary, loc: v.loc,
+    part: v.part, perm: v.perm, remote: v.remote, fast_pay: v.fast_pay,
+    training: v.training, resume: v.resume, url: v.url
+  }));
+  return `Ты — Профи, ИИ-коуч по карьере на сервисе "йоп" (поиск работы для молодёжи 18-24 лет).
+Задача: помочь найти подходящую работу через живой разговор из 3-4 сообщений.
 
-const goalText = {
-  gadgets: "На новый телефон или гаджеты",
-  clothes: "Чтобы обновить гардероб",
-  tickets: "Чтобы оторваться на концерте или в кино",
-  freedom: "Чтобы были свои карманные"
-};
+Текущий город пользователя: ${currentCity}
 
-const coachAnswers = [];
-let coachStep = 0;
+Доступные вакансии (рекомендуй ТОЛЬКО из этого списка):
+${JSON.stringify(cityVacancies)}
+
+Правила:
+- Общайся на "ты", дружелюбно, коротко (1-3 предложения)
+- Задавай по ОДНОМУ вопросу за раз
+- Узнай: что нравится делать, удалённо или нет, подработка или постоянная
+- После 2-3 вопросов порекомендуй 2-3 конкретных вакансии из списка
+- При рекомендации указывай: название, зарплату, строчку для резюме (поле resume)
+- Рекомендуй только реальные вакансии из списка выше, не выдумывай
+- Пиши без markdown, обычным текстом, эмодзи умеренно`;
+}
+
+let apiMessages = [];
+let coachApiKey = sessionStorage.getItem('yop_api_key') || '';
 
 function openCoach() {
   document.getElementById('coach-overlay').classList.add('open');
@@ -458,25 +449,98 @@ function closeCoach() {
   document.getElementById('coach-overlay').classList.remove('open');
 }
 function resetCoach() {
-  coachAnswers.length = 0;
-  coachStep = 0;
+  apiMessages = [];
   document.getElementById('coach-messages').innerHTML = '';
   document.getElementById('coach-options').innerHTML = '';
-  askNext();
+  if (!coachApiKey) {
+    showApiKeyPrompt();
+  } else {
+    startCoachChat();
+  }
 }
 
-function askNext() {
-  if (coachStep >= coachQuestions.length) { finishCoach(); return; }
-  const item = coachQuestions[coachStep];
-  showTyping(() => {
-    addMsg('bot', item.q);
-    if (item.auto) {
-      coachStep++;
-      setTimeout(askNext, 500);
-    } else {
-      renderOptions(item.options);
-    }
+function showApiKeyPrompt() {
+  addMsg('bot', 'Для ИИ-коуча нужен API ключ Anthropic 🔑');
+  addMsg('bot', 'Получи на console.anthropic.com → API Keys');
+  const box = document.getElementById('coach-options');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;width:100%;';
+  const inp = document.createElement('input');
+  inp.type = 'password';
+  inp.placeholder = 'sk-ant-api03-...';
+  inp.className = 'notfound-input';
+  inp.style.margin = '0';
+  const btn = document.createElement('button');
+  btn.className = 'btn-apply';
+  btn.style.cssText = 'margin:0;padding:12px;';
+  btn.textContent = 'Поехали →';
+  const submit = () => {
+    const k = inp.value.trim();
+    if (!k) { inp.style.borderColor = '#f44'; return; }
+    coachApiKey = k;
+    sessionStorage.setItem('yop_api_key', k);
+    box.innerHTML = '';
+    document.getElementById('coach-messages').innerHTML = '';
+    startCoachChat();
+  };
+  btn.addEventListener('click', submit);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  wrap.appendChild(inp);
+  wrap.appendChild(btn);
+  box.appendChild(wrap);
+}
+
+async function startCoachChat() {
+  renderChatInput();
+  apiMessages = [{ role: 'user', content: 'Привет! Помоги найти работу.' }];
+  await callClaude();
+}
+
+function renderChatInput() {
+  const box = document.getElementById('coach-options');
+  box.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;width:100%;';
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;align-items:flex-end;';
+  const ta = document.createElement('textarea');
+  ta.id = 'coach-ta';
+  ta.placeholder = 'Напиши что-нибудь...';
+  ta.className = 'notfound-input';
+  ta.rows = 1;
+  ta.style.cssText = 'flex:1;margin:0;resize:none;min-height:44px;max-height:88px;font-size:14px;line-height:1.4;overflow-y:auto;padding:11px 14px;';
+  const sendBtn = document.createElement('button');
+  sendBtn.id = 'coach-send';
+  sendBtn.className = 'coach-opt';
+  sendBtn.innerHTML = '↑';
+  sendBtn.style.cssText = 'width:44px;height:44px;flex-shrink:0;padding:0;font-size:20px;font-weight:900;border-radius:12px;';
+  const doSend = () => {
+    const txt = ta.value.trim();
+    if (!txt) return;
+    ta.value = '';
+    ta.style.height = 'auto';
+    addMsg('user', txt);
+    apiMessages.push({ role: 'user', content: txt });
+    callClaude();
+  };
+  sendBtn.addEventListener('click', doSend);
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
   });
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 88) + 'px';
+  });
+  row.appendChild(ta);
+  row.appendChild(sendBtn);
+  wrap.appendChild(row);
+  const restartBtn = document.createElement('button');
+  restartBtn.textContent = '↺ Начать заново';
+  restartBtn.className = 'coach-opt coach-restart';
+  restartBtn.style.cssText = 'font-size:12px;padding:7px;';
+  restartBtn.addEventListener('click', resetCoach);
+  wrap.appendChild(restartBtn);
+  box.appendChild(wrap);
 }
 
 function addMsg(role, text) {
@@ -486,104 +550,82 @@ function addMsg(role, text) {
   const c = document.getElementById('coach-messages');
   c.appendChild(m);
   c.scrollTop = c.scrollHeight;
+  return m;
 }
 
-function showTyping(cb) {
+function addTyping() {
   const el = document.createElement('div');
   el.className = 'typing';
   el.innerHTML = '<span></span><span></span><span></span>';
   const c = document.getElementById('coach-messages');
   c.appendChild(el);
   c.scrollTop = c.scrollHeight;
-  document.getElementById('coach-options').innerHTML = '';
-  setTimeout(() => { el.remove(); cb(); }, 700);
+  return el;
 }
 
-function renderOptions(options) {
-  const box = document.getElementById('coach-options');
-  box.innerHTML = '';
-  options.forEach(o => {
-    const b = document.createElement('button');
-    b.className = 'coach-opt';
-    b.textContent = o.label;
-    b.addEventListener('click', () => {
-      coachAnswers.push(o.key);
-      addMsg('user', o.label);
-      coachStep++;
-      box.innerHTML = '';
-      askNext();
+async function callClaude() {
+  const ta = document.getElementById('coach-ta');
+  const sendBtn = document.getElementById('coach-send');
+  if (ta) ta.disabled = true;
+  if (sendBtn) sendBtn.disabled = true;
+  const typing = addTyping();
+  const msgs = document.getElementById('coach-messages');
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': coachApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',
+        max_tokens: 600,
+        stream: true,
+        system: getSystemPrompt(),
+        messages: apiMessages
+      })
     });
-    box.appendChild(b);
-  });
-}
-
-function pickArchetype(a) {
-  const [activity, place] = a;
-  if (activity === 'people') return {
-    title: "Сервис и общение 💁",
-    desc: "Продавец, кассир, администратор, официант — там, где встречают людей.",
-    match: v => /продав|кассир|админ|официант|менедж|ассистент/i.test(v.title)
-  };
-  if (activity === 'hands') return {
-    title: "Курьер и склад 📦",
-    desc: "Пеший курьер, упаковщик, сборщик, грузчик — простой вход и быстрые деньги.",
-    match: v => /грузчик|упаковщик|сборщик|пеший|склад|кладовщик|повар|слесар|курьер|водитель/i.test(v.title)
-  };
-  if (activity === 'digital' && place === 'remote') return {
-    title: "Удалёнка из дома 💻",
-    desc: "Поддержка, контент-менеджер, маркетплейсы — работа в чатах с ноутбука.",
-    match: v => v.remote
-  };
-  return {
-    title: "Колл-центр и поддержка ☎️",
-    desc: "Оператор колл-центра, поддержка клиентов — стабильная нагрузка и понятные KPI.",
-    match: v => /оператор|колл|поддерж|менедж/i.test(v.title)
-  };
-}
-
-function finishCoach() {
-  const arch = pickArchetype(coachAnswers);
-  const sched = coachAnswers[2];
-  let pool = vacancies.filter(v => v.city === currentCity && arch.match(v));
-  if (sched === 'part') pool = pool.filter(v => v.part).concat(pool.filter(v => !v.part));
-  if (sched === 'perm') pool = pool.filter(v => v.perm).concat(pool.filter(v => !v.perm));
-  const picks = [];
-  const seen = new Set();
-  for (const v of pool) {
-    if (!seen.has(v.title)) { picks.push(v); seen.add(v.title); }
-    if (picks.length >= 3) break;
-  }
-
-  const goal = coachAnswers[3];
-  const intro = goalText[goal] ? `${goalText[goal]} — держи топ вакансий 👇` : "Готово! Вот что тебе подойдёт 👇";
-
-  showTyping(() => {
-    addMsg('bot', intro);
-    const card = document.createElement('div');
-    card.className = 'coach-result';
-    card.innerHTML = `
-      <div class="coach-result-title">${arch.title}</div>
-      <div class="coach-result-desc">${arch.desc}</div>
-      ${picks.length
-        ? picks.map(v => `
-          <div class="coach-vac" data-url="${v.url}">
-            <div class="coach-vac-title">${v.title}</div>
-            <div class="coach-vac-salary">${v.salary}</div>
-            <div class="coach-vac-emp">${v.emp} · ${v.loc}</div>
-          </div>
-        `).join('')
-        : `<div class="coach-empty">В ${currentCity} пока нет подходящих вакансий — попробуй сменить город или ответить иначе.</div>`
+    if (!resp.ok) {
+      let errText = 'Ошибка ' + resp.status;
+      try { const e = await resp.json(); errText = e.error?.message || errText; } catch {}
+      if (resp.status === 401) { coachApiKey = ''; sessionStorage.removeItem('yop_api_key'); }
+      throw new Error(errText);
+    }
+    typing.remove();
+    const botEl = addMsg('bot', '');
+    let full = '';
+    let buf = '';
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const ev = JSON.parse(line.slice(6));
+          if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
+            full += ev.delta.text;
+            botEl.textContent = full;
+            msgs.scrollTop = msgs.scrollHeight;
+          }
+        } catch {}
       }
-    `;
-    const msgs = document.getElementById('coach-messages');
-    msgs.appendChild(card);
-    msgs.scrollTop = msgs.scrollHeight;
-    card.querySelectorAll('.coach-vac').forEach(el => {
-      el.addEventListener('click', () => window.open(el.dataset.url, '_blank'));
-    });
-    document.getElementById('coach-options').innerHTML = '<button class="coach-opt coach-restart" id="coach-restart">↺ Начать заново</button>';
-    document.getElementById('coach-restart').addEventListener('click', resetCoach);
-  });
+    }
+    if (full) apiMessages.push({ role: 'assistant', content: full });
+  } catch (err) {
+    typing.remove();
+    addMsg('bot', '⚠️ ' + err.message);
+    if (!coachApiKey) setTimeout(showApiKeyPrompt, 800);
+  } finally {
+    if (ta) { ta.disabled = false; ta.focus(); }
+    if (sendBtn) sendBtn.disabled = false;
+  }
 }
 
 document.getElementById('coach-btn').addEventListener('click', openCoach);
