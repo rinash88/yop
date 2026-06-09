@@ -438,7 +438,7 @@ ${JSON.stringify(cityVacancies)}
 - Пиши без markdown, обычным текстом, эмодзи умеренно`;
 }
 
-const COACH_API_KEY = '__COACH_API_KEY__';
+const PROXY_URL = 'http://217.177.72.86/v1/messages';
 let apiMessages = [];
 
 function openCoach() {
@@ -536,14 +536,9 @@ async function callClaude() {
   const typing = addTyping();
   const msgs = document.getElementById('coach-messages');
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await fetch(PROXY_URL, {
       method: 'POST',
-      headers: {
-        'x-api-key': COACH_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
         max_tokens: 600,

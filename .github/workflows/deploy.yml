@@ -22,9 +22,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inject API key
-        run: sed -i "s|__COACH_API_KEY__|${{ secrets.COACH_API_KEY }}|g" index.html
-
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
