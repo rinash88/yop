@@ -61,7 +61,7 @@ html, body { background: #f0f0f0; font-family: -apple-system, 'SF Pro Text', 'He
 .emp-badge { display: inline-block; background: #c6f135; border: 2px solid #111; border-radius: 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 9px; color: #111; margin-bottom: 5px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .src-badge { display: inline-block; border: 1.5px solid; border-radius: 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.3px; padding: 2px 7px; background: #fff; }
 .src-badge-rabota { color: #272061; border-color: #272061; }
-.src-badge-jam { color: #ff5a11; border-color: #ff5a11; }
+.src-badge-jam { border-color: #ff5a11; }
 .card-dist { font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0; margin-left: 8px; }
 .card-title { font-size: 17px; font-weight: 900; line-height: 1.2; letter-spacing: -0.3px; margin-bottom: 2px; }
 .card-salary { font-size: 16px; font-weight: 900; margin-bottom: 10px; }
@@ -449,7 +449,7 @@ function render() {
       <div class="card-top">
         <div>
           <div><span class="emp-badge">${v.emp}</span></div>
-          <div><span class="src-badge ${v.jam ? 'src-badge-jam' : 'src-badge-rabota'}">${v.jam ? 'jamjob' : 'от Работа.ру'}</span></div>
+          <div>${v.jam ? '<span class="src-badge src-badge-jam"><span style="color:#ff5a11">джем</span><span style="color:#272061">работа</span></span>' : '<span class="src-badge src-badge-rabota">от Работа.ру</span>'}</div>
         </div>
         <div class="card-dist">📍 ${v.loc}</div>
       </div>
