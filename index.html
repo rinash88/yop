@@ -12,6 +12,22 @@ html, body { background: #f0f0f0; font-family: -apple-system, 'SF Pro Text', 'He
 .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%) translateY(-80px); background: #111; color: #fff; font-size: 13px; font-weight: 600; padding: 10px 20px; border-radius: 20px; z-index: 100; transition: transform 0.3s ease; white-space: nowrap; }
 .toast.show { transform: translateX(-50%) translateY(0); }
 
+/* login gate */
+.login-gate { position: fixed; inset: 0; background: #f0f0f0; z-index: 999; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.login-card { background: #fff; border: 2.5px solid #111; border-radius: 24px; padding: 36px 28px 32px; width: 100%; max-width: 380px; }
+.login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
+.login-logo-badge { display: inline-flex; align-items: center; background: #c6f135; border: 2.5px solid #111; border-radius: 16px; padding: 6px 16px 6px 10px; gap: 9px; }
+.login-logo-dot { width: 30px; height: 30px; border-radius: 50%; background: #111; display: flex; align-items: center; justify-content: center; }
+.login-logo-dot-inner { width: 11px; height: 11px; border-radius: 50%; background: #c6f135; }
+.login-logo-text { font-size: 32px; font-weight: 900; letter-spacing: -2px; color: #111; }
+.login-title { font-size: 22px; font-weight: 900; margin-bottom: 6px; }
+.login-sub { font-size: 14px; color: #888; font-weight: 500; margin-bottom: 28px; }
+.login-input { width: 100%; border: 2.5px solid #111; border-radius: 14px; font-size: 22px; font-weight: 700; padding: 14px 18px; letter-spacing: 8px; text-align: center; background: #f0f0f0; outline: none; margin-bottom: 16px; }
+.login-input.error { border-color: #ff3b30; background: #fff0ef; }
+.login-btn { width: 100%; background: #111; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 800; padding: 16px; cursor: pointer; }
+.login-btn:active { opacity: 0.85; }
+.login-err { color: #ff3b30; font-size: 13px; font-weight: 700; text-align: center; margin-top: 12px; min-height: 18px; }
+
 .header { background: #fff; padding: 14px 16px; border-bottom: 2px solid #111; }
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .logo-wrap { display: flex; align-items: center; gap: 0; }
@@ -143,6 +159,23 @@ html, body { background: #f0f0f0; font-family: -apple-system, 'SF Pro Text', 'He
 </style>
 </head>
 <body>
+
+<div class="login-gate" id="login-gate">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-badge">
+        <div class="login-logo-dot"><div class="login-logo-dot-inner"></div></div>
+        <div class="login-logo-text">йоп</div>
+      </div>
+    </div>
+    <div class="login-title">Добро пожаловать</div>
+    <div class="login-sub">Введи пароль для доступа</div>
+    <input class="login-input" id="login-input" type="password" inputmode="numeric" maxlength="10" placeholder="····" autofocus>
+    <button class="login-btn" onclick="checkPassword()">Войти →</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
 <div class="app">
 
 <div class="toast" id="toast">✨ Подобрали вакансии под тебя!</div>
@@ -250,6 +283,33 @@ html, body { background: #f0f0f0; font-family: -apple-system, 'SF Pro Text', 'He
 
 </div>
 <script>
+// login gate
+(function() {
+  if (sessionStorage.getItem('yop_auth') === '1') {
+    document.getElementById('login-gate').style.display = 'none';
+  }
+})();
+
+function checkPassword() {
+  const val = document.getElementById('login-input').value;
+  const inp = document.getElementById('login-input');
+  const err = document.getElementById('login-err');
+  if (val === '0890') {
+    sessionStorage.setItem('yop_auth', '1');
+    document.getElementById('login-gate').style.display = 'none';
+  } else {
+    inp.classList.add('error');
+    err.textContent = 'Неверный пароль. Попробуй ещё раз.';
+    inp.value = '';
+    setTimeout(() => { inp.classList.remove('error'); }, 1500);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const inp = document.getElementById('login-input');
+  if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') checkPassword(); });
+});
+
 const vacancies = [
   // ===== МОСКВА =====
   {city:"Москва",title:"Работник торгового зала (ТЦ Ярославский)",emp:"Familia",salary:"до 40 000 руб./мес.",loc:"м. Алексеевская",part:true,perm:false,remote:false,fast_pay:false,training:true,official:true,url:"https://www.rabota.ru/vacancy/54293424/",resume:"Продавец-консультант · розничная торговля · работа с покупателями"},
